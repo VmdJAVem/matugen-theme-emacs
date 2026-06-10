@@ -4,57 +4,63 @@
 
 ;; Author: Diego
 ;; Maintainer: Diego
-;; Version: 0.2.0
+;; Version: 0.3.0
 ;; Package-Requires: ((emacs "28.1") (modus-themes "4.0"))
 ;; Keywords: themes, matugen, wayland, ricing
 
 ;;; Commentary:
 
-;; Este paquete permite integrar la paleta de colores generada por `matugen`
-;; directamente con tu Emacs usando `modus-themes`.
-;; Matugen debe configurarse para exportar un archivo JSON con los colores
-;; tanto en su variante clara como oscura.
+;; Este paquete permite integrar la paleta de colores de Ghostty (dankcolors)
+;; generada por Matugen/Wallust en Adank Linux directamente con Emacs.
 
 ;;; Code:
 
-(require 'json)
 (require 'filenotify)
 (require 'modus-themes)
 
 (defgroup matugen-theme nil
-  "Dynamic theme switcher based on Matugen color palettes."
+  "Dynamic theme switcher based on Ghostty dankcolors (Adank Linux)."
   :group 'modus-themes
   :prefix "matugen-theme-")
 
-(defcustom matugen-theme-colors-file (expand-file-name "~/.cache/matugen-colors.json")
-  "Ruta al archivo JSON generado por Matugen."
+(defcustom matugen-theme-colors-file (expand-file-name "~/.config/ghostty/themes/dankcolors")
+  "Ruta al archivo de colores dankcolors de Ghostty."
   :type 'file
   :group 'matugen-theme)
 
 (defvar matugen-theme--file-watch-descriptor nil
-  "Descriptor para el file watcher del JSON de colores.")
+  "Descriptor para el file watcher.")
 
-(defun matugen-theme--read-colors ()
-  "Lee el archivo JSON de colores y lo devuelve como alist."
+(defun matugen-theme--read-dankcolors ()
+  "Lee el archivo de dankcolors y lo devuelve como alist."
   (when (file-exists-p matugen-theme-colors-file)
-    (let ((json-object-type 'alist)
-          (json-array-type 'list)
-          (json-key-type 'symbol))
-      (json-read-file matugen-theme-colors-file))))
+    (let ((colors nil))
+      (with-temp-buffer
+        (insert-file-contents matugen-theme-colors-file)
+        (goto-char (point-min))
+        (while (re-search-forward "^\\([a-z-]+\\) = \\(#[0-9a-fA-F]+\\)" nil t)
+          (push (cons (intern (match-string 1)) (match-string 2)) colors))
+        (goto-char (point-min))
+        (while (re-search-forward "^palette = \\([0-9]+\\)=\\(#[0-9a-fA-F]+\\)" nil t)
+          (push (cons (intern (format "palette-%s" (match-string 1))) (match-string 2)) colors)))
+      colors)))
 
-(defun matugen-theme--apply (mode-type base-theme)
-  "Aplica la paleta de colores del JSON dada por MODE-TYPE (light o dark) y carga BASE-THEME."
-  (let* ((colors-full (matugen-theme--read-colors))
-         (colors (cdr (assq mode-type colors-full))))
+(defun matugen-theme-reload ()
+  "Recarga la paleta leyendo el archivo dankcolors y aplicándolo a modus-themes."
+  (interactive)
+  (let ((colors (matugen-theme--read-dankcolors))
+        (base-theme (or (modus-themes--current-theme) 'modus-vivendi)))
     (when colors
-      (let ((primary (cdr (assq 'primary colors)))
-            (secondary (cdr (assq 'secondary colors)))
-            (tertiary (cdr (assq 'tertiary colors)))
-            (error (cdr (assq 'error colors)))
-            (bg (cdr (assq 'background colors)))
-            (fg (cdr (assq 'on_background colors)))
-            (surface (cdr (assq 'surface colors)))
-            (surface-var (cdr (assq 'surface_variant colors))))
+      (let ((bg (cdr (assq 'background colors)))
+            (fg (cdr (assq 'foreground colors)))
+            (primary (cdr (assq 'palette-4 colors)))   ;; Blue
+            (secondary (cdr (assq 'palette-6 colors))) ;; Cyan
+            (tertiary (cdr (assq 'palette-5 colors)))  ;; Magenta
+            (error (cdr (assq 'palette-1 colors)))     ;; Red
+            (surface (cdr (assq 'palette-0 colors)))   ;; Black (Dim/Background alternative)
+            (surface-var (cdr (assq 'selection-background colors))))
+        
+        ;; Ajuste: Si ghostty manda un fondo oscuro, usamos vivendi
         (setq modus-themes-common-palette-overrides
               `((bg-main ,bg)
                 (fg-main ,fg)
@@ -68,30 +74,9 @@
                 (blue-cooler ,primary)
                 (blue-warmer ,secondary)
                 (magenta-cooler ,tertiary)))
+        
         (modus-themes-load-theme base-theme)
-        (message "Matugen: Tema %s aplicado." mode-type)))))
-
-;;;###autoload
-(defun matugen-theme-load-dark ()
-  "Aplica los colores oscuros de Matugen y carga `modus-vivendi`."
-  (interactive)
-  (matugen-theme--apply 'dark 'modus-vivendi))
-
-;;;###autoload
-(defun matugen-theme-load-light ()
-  "Aplica los colores claros de Matugen y carga `modus-operandi`."
-  (interactive)
-  (matugen-theme--apply 'light 'modus-operandi))
-
-;;;###autoload
-(defun matugen-theme-reload ()
-  "Recarga la paleta utilizando la variante actual del sistema."
-  (interactive)
-  (let ((current-theme (or (modus-themes--current-theme) 'modus-vivendi)))
-    ;; Si el tema actual contiene 'operandi' o 'light', usamos la variante clara.
-    (if (string-match-p "operandi\\|light" (symbol-name current-theme))
-        (matugen-theme-load-light)
-      (matugen-theme-load-dark))))
+        (message "Matugen (Dank Linux): Paleta de colores aplicada.")))))
 
 (defun matugen-theme--watcher-callback (event)
   "Callback que se ejecuta cuando el archivo de colores cambia."
@@ -100,7 +85,7 @@
 
 ;;;###autoload
 (define-minor-mode matugen-theme-mode
-  "Minor mode global para sincronizar Emacs con los colores de Matugen."
+  "Minor mode global para sincronizar Emacs con los colores de Ghostty / Adank Linux."
   :global t
   :lighter " Matugen"
   (if matugen-theme-mode
