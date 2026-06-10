@@ -4,7 +4,7 @@
 
 ;; Author: Diego
 ;; Maintainer: Diego
-;; Version: 0.3.3
+;; Version: 0.4.0
 ;; Package-Requires: ((emacs "28.1") (modus-themes "4.0"))
 ;; Keywords: themes, matugen, wayland, ricing
 
@@ -12,11 +12,14 @@
 
 ;; Este paquete permite integrar la paleta de colores de Ghostty (dankcolors)
 ;; generada por Matugen/Wallust en Adank Linux directamente con Emacs.
+;; Incorpora ajustes de legibilidad (aclarado/oscurecido) para mantener el
+;; contraste AAA de Modus Themes.
 
 ;;; Code:
 
 (require 'filenotify)
 (require 'modus-themes)
+(require 'color)
 
 (defgroup matugen-theme nil
   "Dynamic theme switcher based on Ghostty dankcolors (Adank Linux)."
@@ -45,56 +48,87 @@
           (push (cons (intern (format "palette-%s" (match-string 1))) (match-string 2)) colors)))
       colors)))
 
+(defun matugen-theme--mod-color (hex percent lighten)
+  "Aclara u oscurece un HEX un PERCENT (0-100).
+Si LIGHTEN es no-nil aclara, si es nil oscurece."
+  (if lighten
+      (color-lighten-name hex percent)
+    (color-darken-name hex percent)))
+
 ;;;###autoload
 (defun matugen-theme-reload ()
   "Recarga la paleta leyendo el archivo dankcolors y aplicándolo a modus-themes."
   (interactive)
   (let ((colors (matugen-theme--read-dankcolors))
-        ;; Determinar el tema activo sin depender de funciones privadas obsoletas
         (base-theme (if (memq 'modus-operandi custom-enabled-themes)
                         'modus-operandi
                       'modus-vivendi)))
     (when colors
-      (let ((bg (cdr (assq 'background colors)))
-            (fg (cdr (assq 'foreground colors)))
-            (primary (cdr (assq 'palette-4 colors)))   ;; Blue
-            (secondary (cdr (assq 'palette-6 colors))) ;; Cyan
-            (tertiary (cdr (assq 'palette-5 colors)))  ;; Magenta
-            (error (cdr (assq 'palette-1 colors)))     ;; Red
-            (surface (cdr (assq 'palette-0 colors)))   ;; Black (Dim/Background alternative)
-            (surface-var (cdr (assq 'selection-background colors))))
+      (let* ((bg (cdr (assq 'background colors)))
+             (fg (cdr (assq 'foreground colors)))
+             (primary (cdr (assq 'palette-4 colors)))   ;; Blue
+             (secondary (cdr (assq 'palette-6 colors))) ;; Cyan
+             (tertiary (cdr (assq 'palette-5 colors)))  ;; Magenta
+             (error (cdr (assq 'palette-1 colors)))     ;; Red
+             (green (cdr (assq 'palette-2 colors)))     ;; Green
+             (yellow (cdr (assq 'palette-3 colors)))    ;; Yellow
+             
+             ;; Lógica de Legibilidad: 
+             ;; Si es oscuro (vivendi), aclaramos el fondo para bg-dim y bg-alt.
+             ;; Si es claro (operandi), lo oscurecemos.
+             (is-dark (eq base-theme 'modus-vivendi))
+             (bg-dim (matugen-theme--mod-color bg 5 is-dark))
+             (bg-alt (matugen-theme--mod-color bg 10 is-dark))
+             (bg-active (matugen-theme--mod-color bg 15 is-dark))
+             
+             (fg-dim (matugen-theme--mod-color fg 20 (not is-dark))))
         
-        ;; Ajuste: Si ghostty manda un fondo oscuro, usamos vivendi
+        ;; Ajuste de paleta con cálculos matemáticos para salvar la legibilidad Modus
         (setq modus-themes-common-palette-overrides
               `((bg-main ,bg)
                 (fg-main ,fg)
-                (bg-dim ,surface)
-                (bg-alt ,surface-var)
-                (border ,surface-var)
+                (bg-dim ,bg-dim)
+                (bg-alt ,bg-alt)
+                (bg-active ,bg-active)
+                (bg-inactive ,bg-dim)
+                (border ,bg-alt)
+                (fg-dim ,fg-dim)
+                
+                ;; Colores semánticos base
                 (blue ,primary)
                 (cyan ,secondary)
                 (magenta ,tertiary)
                 (red ,error)
-                (blue-cooler ,primary)
-                (blue-warmer ,secondary)
-                (magenta-cooler ,tertiary)))
+                (green ,green)
+                (yellow ,yellow)
+                
+                ;; Variantes para legibilidad en sintaxis de código
+                (blue-cooler ,(matugen-theme--mod-color primary 15 nil))
+                (blue-warmer ,(matugen-theme--mod-color primary 15 t))
+                (magenta-cooler ,(matugen-theme--mod-color tertiary 15 nil))
+                (magenta-warmer ,(matugen-theme--mod-color tertiary 15 t))
+                (red-cooler ,(matugen-theme--mod-color error 15 nil))
+                (red-warmer ,(matugen-theme--mod-color error 15 t))
+                (green-cooler ,(matugen-theme--mod-color green 15 nil))
+                (green-warmer ,(matugen-theme--mod-color green 15 t))
+                (yellow-cooler ,(matugen-theme--mod-color yellow 15 nil))
+                (yellow-warmer ,(matugen-theme--mod-color yellow 15 t))))
         
         (disable-theme base-theme)
         (modus-themes-load-theme base-theme)
         
-        ;; Forzar a Doom Emacs a actualizar sus propios paquetes y buffers (como Solaire-mode)
+        ;; Forzar a Doom Emacs a actualizar sus paquetes UI (Solaire-mode, etc)
         (when (fboundp 'doom/reload-theme)
           (doom/reload-theme))
         (when (featurep 'solaire-mode)
           (solaire-global-mode -1)
           (solaire-global-mode 1))
           
-        (message "Matugen (Dank Linux): Paleta de colores aplicada.")))))
+        (message "Matugen: Color palette applied.")))))
 
 (defun matugen-theme--watcher-callback (event)
   "Callback que se ejecuta cuando el archivo de colores cambia."
   (let ((file (nth 2 event)))
-    ;; Comprobamos si el archivo modificado en el directorio es el nuestro
     (when (and (stringp file)
                (string= (file-name-nondirectory file)
                         (file-name-nondirectory matugen-theme-colors-file)))
@@ -108,8 +142,6 @@
   (if matugen-theme-mode
       (progn
         (when (file-exists-p matugen-theme-colors-file)
-          ;; Para 'emacs normal' (standalone), esperamos a que Doom Emacs termine de inicializarse
-          ;; antes de aplicar los overrides. Si es cliente/demonio, lo aplicamos de una.
           (if after-init-time
               (matugen-theme-reload)
             (add-hook 'emacs-startup-hook #'matugen-theme-reload)))
@@ -118,8 +150,6 @@
           (let ((dir (file-name-directory matugen-theme-colors-file)))
             (unless (file-exists-p dir)
               (make-directory dir t))
-            ;; Ojo: Vigilamos el DIRECTORIO, no el archivo directamente.
-            ;; Esto evita que el watcher muera si Dank Linux usa 'mv' o reemplaza el inodo.
             (setq matugen-theme--file-watch-descriptor
                   (file-notify-add-watch dir
                                          '(change attribute-change)
