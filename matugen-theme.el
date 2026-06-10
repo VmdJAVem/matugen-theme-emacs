@@ -4,7 +4,7 @@
 
 ;; Author: Diego
 ;; Maintainer: Diego
-;; Version: 0.3.0
+;; Version: 0.3.1
 ;; Package-Requires: ((emacs "28.1") (modus-themes "4.0"))
 ;; Keywords: themes, matugen, wayland, ricing
 
@@ -45,11 +45,15 @@
           (push (cons (intern (format "palette-%s" (match-string 1))) (match-string 2)) colors)))
       colors)))
 
+;;;###autoload
 (defun matugen-theme-reload ()
   "Recarga la paleta leyendo el archivo dankcolors y aplicándolo a modus-themes."
   (interactive)
   (let ((colors (matugen-theme--read-dankcolors))
-        (base-theme (or (modus-themes--current-theme) 'modus-vivendi)))
+        ;; Determinar el tema activo sin depender de funciones privadas obsoletas
+        (base-theme (if (memq 'modus-operandi custom-enabled-themes)
+                        'modus-operandi
+                      'modus-vivendi)))
     (when colors
       (let ((bg (cdr (assq 'background colors)))
             (fg (cdr (assq 'foreground colors)))
