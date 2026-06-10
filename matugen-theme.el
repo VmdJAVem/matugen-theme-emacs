@@ -4,7 +4,7 @@
 
 ;; Author: Diego
 ;; Maintainer: Diego
-;; Version: 0.3.2
+;; Version: 0.3.3
 ;; Package-Requires: ((emacs "28.1") (modus-themes "4.0"))
 ;; Keywords: themes, matugen, wayland, ricing
 
@@ -93,8 +93,12 @@
 
 (defun matugen-theme--watcher-callback (event)
   "Callback que se ejecuta cuando el archivo de colores cambia."
-  (when (memq (nth 1 event) '(changed attribute-changed created))
-    (matugen-theme-reload)))
+  (let ((file (nth 2 event)))
+    ;; Comprobamos si el archivo modificado en el directorio es el nuestro
+    (when (and (stringp file)
+               (string= (file-name-nondirectory file)
+                        (file-name-nondirectory matugen-theme-colors-file)))
+      (matugen-theme-reload))))
 
 ;;;###autoload
 (define-minor-mode matugen-theme-mode
@@ -104,15 +108,22 @@
   (if matugen-theme-mode
       (progn
         (when (file-exists-p matugen-theme-colors-file)
-          (matugen-theme-reload))
+          ;; Para 'emacs normal' (standalone), esperamos a que Doom Emacs termine de inicializarse
+          ;; antes de aplicar los overrides. Si es cliente/demonio, lo aplicamos de una.
+          (if after-init-time
+              (matugen-theme-reload)
+            (add-hook 'emacs-startup-hook #'matugen-theme-reload)))
+        
         (unless matugen-theme--file-watch-descriptor
           (let ((dir (file-name-directory matugen-theme-colors-file)))
             (unless (file-exists-p dir)
-              (make-directory dir t)))
-          (setq matugen-theme--file-watch-descriptor
-                (file-notify-add-watch matugen-theme-colors-file
-                                       '(change attribute-change)
-                                       #'matugen-theme--watcher-callback))))
+              (make-directory dir t))
+            ;; Ojo: Vigilamos el DIRECTORIO, no el archivo directamente.
+            ;; Esto evita que el watcher muera si Dank Linux usa 'mv' o reemplaza el inodo.
+            (setq matugen-theme--file-watch-descriptor
+                  (file-notify-add-watch dir
+                                         '(change attribute-change)
+                                         #'matugen-theme--watcher-callback)))))
     (when matugen-theme--file-watch-descriptor
       (file-notify-rm-watch matugen-theme--file-watch-descriptor)
       (setq matugen-theme--file-watch-descriptor nil))))
