@@ -4,7 +4,7 @@
 
 ;; Author: Diego
 ;; Maintainer: Diego
-;; Version: 0.1.0
+;; Version: 0.2.0
 ;; Package-Requires: ((emacs "28.1") (modus-themes "4.0"))
 ;; Keywords: themes, matugen, wayland, ricing
 
@@ -12,9 +12,8 @@
 
 ;; Este paquete permite integrar la paleta de colores generada por `matugen`
 ;; directamente con tu Emacs usando `modus-themes`.
-;; Matugen debe configurarse para exportar un archivo JSON con los colores.
-;; Cuando el archivo JSON cambia, este paquete recarga automáticamente
-;; tu tema.
+;; Matugen debe configurarse para exportar un archivo JSON con los colores
+;; tanto en su variante clara como oscura.
 
 ;;; Code:
 
@@ -32,14 +31,6 @@
   :type 'file
   :group 'matugen-theme)
 
-(defcustom matugen-theme-style 'accent
-  "Estilo de integración de la paleta.
-Puede ser `accent` para cambiar solo los acentos (mantiene el contraste de Modus)
-o `full` para sobreescribir el fondo y toda la paleta con los colores de Matugen."
-  :type '(choice (const :tag "Solo acentos" accent)
-                 (const :tag "Tema completo" full))
-  :group 'matugen-theme)
-
 (defvar matugen-theme--file-watch-descriptor nil
   "Descriptor para el file watcher del JSON de colores.")
 
@@ -51,33 +42,10 @@ o `full` para sobreescribir el fondo y toda la paleta con los colores de Matugen
           (json-key-type 'symbol))
       (json-read-file matugen-theme-colors-file))))
 
-;;;###autoload
-(defun matugen-theme-apply-accent ()
-  "Aplica la paleta de Matugen solo a los acentos de `modus-themes`."
-  (interactive)
-  (let ((colors (matugen-theme--read-colors)))
-    (when colors
-      (let ((primary (cdr (assq 'primary colors)))
-            (secondary (cdr (assq 'secondary colors)))
-            (tertiary (cdr (assq 'tertiary colors)))
-            (error (cdr (assq 'error colors))))
-        (setq modus-themes-common-palette-overrides
-              `((blue ,primary)
-                (cyan ,secondary)
-                (magenta ,tertiary)
-                (red ,error)
-                (blue-cooler ,primary)
-                (blue-warmer ,secondary)
-                (magenta-cooler ,tertiary)))
-        (when (modus-themes--current-theme)
-          (modus-themes-load-theme (modus-themes--current-theme)))
-        (message "Matugen: Acentos aplicados.")))))
-
-;;;###autoload
-(defun matugen-theme-apply-full ()
-  "Aplica la paleta completa de Matugen a `modus-themes` (fondos, bordes, etc)."
-  (interactive)
-  (let ((colors (matugen-theme--read-colors)))
+(defun matugen-theme--apply (mode-type base-theme)
+  "Aplica la paleta de colores del JSON dada por MODE-TYPE (light o dark) y carga BASE-THEME."
+  (let* ((colors-full (matugen-theme--read-colors))
+         (colors (cdr (assq mode-type colors-full))))
     (when colors
       (let ((primary (cdr (assq 'primary colors)))
             (secondary (cdr (assq 'secondary colors)))
@@ -100,22 +68,33 @@ o `full` para sobreescribir el fondo y toda la paleta con los colores de Matugen
                 (blue-cooler ,primary)
                 (blue-warmer ,secondary)
                 (magenta-cooler ,tertiary)))
-        (when (modus-themes--current-theme)
-          (modus-themes-load-theme (modus-themes--current-theme)))
-        (message "Matugen: Tema completo aplicado.")))))
+        (modus-themes-load-theme base-theme)
+        (message "Matugen: Tema %s aplicado." mode-type)))))
+
+;;;###autoload
+(defun matugen-theme-load-dark ()
+  "Aplica los colores oscuros de Matugen y carga `modus-vivendi`."
+  (interactive)
+  (matugen-theme--apply 'dark 'modus-vivendi))
+
+;;;###autoload
+(defun matugen-theme-load-light ()
+  "Aplica los colores claros de Matugen y carga `modus-operandi`."
+  (interactive)
+  (matugen-theme--apply 'light 'modus-operandi))
 
 ;;;###autoload
 (defun matugen-theme-reload ()
-  "Recarga la paleta según el estilo configurado."
+  "Recarga la paleta utilizando la variante actual del sistema."
   (interactive)
-  (if (eq matugen-theme-style 'full)
-      (matugen-theme-apply-full)
-    (matugen-theme-apply-accent)))
+  (let ((current-theme (or (modus-themes--current-theme) 'modus-vivendi)))
+    ;; Si el tema actual contiene 'operandi' o 'light', usamos la variante clara.
+    (if (string-match-p "operandi\\|light" (symbol-name current-theme))
+        (matugen-theme-load-light)
+      (matugen-theme-load-dark))))
 
 (defun matugen-theme--watcher-callback (event)
   "Callback que se ejecuta cuando el archivo de colores cambia."
-  ;; file-notify events usually look like (descriptor action file . info)
-  ;; where action is 'changed, 'created, 'attribute-changed etc.
   (when (memq (nth 1 event) '(changed attribute-changed created))
     (matugen-theme-reload)))
 
@@ -126,12 +105,9 @@ o `full` para sobreescribir el fondo y toda la paleta con los colores de Matugen
   :lighter " Matugen"
   (if matugen-theme-mode
       (progn
-        ;; Aplicar inicialmente si el archivo existe
         (when (file-exists-p matugen-theme-colors-file)
           (matugen-theme-reload))
-        ;; Iniciar watcher
         (unless matugen-theme--file-watch-descriptor
-          ;; Asegurarse que el directorio exista
           (let ((dir (file-name-directory matugen-theme-colors-file)))
             (unless (file-exists-p dir)
               (make-directory dir t)))
@@ -139,7 +115,6 @@ o `full` para sobreescribir el fondo y toda la paleta con los colores de Matugen
                 (file-notify-add-watch matugen-theme-colors-file
                                        '(change attribute-change)
                                        #'matugen-theme--watcher-callback))))
-    ;; Disable mode
     (when matugen-theme--file-watch-descriptor
       (file-notify-rm-watch matugen-theme--file-watch-descriptor)
       (setq matugen-theme--file-watch-descriptor nil))))
