@@ -6,10 +6,10 @@ It is particularly well-suited for dynamic ricing environments on Wayland compos
 
 ## Features
 
-- **Scientific Colour Engine:** Mathematically generates 6 perfect syntax colours by rotating the Hue of your primary Matugen color. It then tests and recursively darkens/lightens your background to guarantee a 4.5:1 WCAG contrast ratio for every syntax element.
-- **Interactive Style Previews:** Run `M-x matugen-theme-select-style` to instantly test different cyberpunk or scientific aesthetics in real-time.
+- **Pure Native Theme:** Completely standalone architecture. It dynamically builds and compiles an Emacs `deftheme` (`matugen`) at runtime without relying on external theme engines like Modus or Doom Themes.
+- **Native Palette Mapping:** Reads your 16-color Matugen output (`palette-1` through `palette-6`) and perfectly maps them to standard UI elements, Org-mode headings, and syntax highlighting.
+- **Interactive Style Previews:** Run `M-x matugen-theme-select-style` to instantly test different aesthetics (Neon, Harmonized, Accent, Full) in real-time, acting as visual filters over your Matugen palette.
 - **Dynamic Theme Switching:** Actively monitors a designated colour palette file and updates the Emacs theme in real-time, without requiring an editor restart.
-- **Comprehensive Integration:** Natively overrides core UI elements such as the mode-line, current line highlight, and prevents face clashing across Emacs packages.
 
 ## Installation and Configuration
 
@@ -30,7 +30,7 @@ You can install and configure `matugen-theme` using `use-package` and `package-v
   (matugen-theme-colors-file (expand-file-name "~/.config/emacs/matugen-colors.conf"))
   
   ;; Choose your preferred aesthetic style
-  (matugen-theme-style 'sci-tinted-keyword)
+  (matugen-theme-style 'full)
   
   :config
   ;; Enable the global minor mode to start watching the directory.
@@ -81,8 +81,8 @@ Once configured, any time Matugen recalculates colours (such as when DankMateria
 
 Matugen generates a colour palette based on an image (usually the current wallpaper). By instructing Matugen to export a simple template containing keys like `background = #hex` and `palette = 1=#hex`, this Emacs package can parse those exact colours.
 
-When the file is modified by your system scripts, `matugen-theme-mode` evaluates the background colour's luminance. If it is dark, it purges active themes and loads `modus-vivendi`; if it is light, it switches to `modus-operandi`. It then injects the exact colours from Matugen as semantic overrides, scaling them mathematically for active borders, fringes, and inactive backgrounds to ensure depth and contrast are maintained.
+When the file is modified by your system scripts, `matugen-theme-mode` evaluates the background colour's luminance. It natively compiles a custom Emacs `deftheme`, applying your exact Matugen colors directly to Font-Lock syntax highlighting, Org-mode levels, and UI features (like Vertico or Doom Dashboard). It relies on mathematical filters (like `ensure-contrast` and Alpha-blending) to guarantee that, no matter the wallpaper, the text remains strictly legible according to WCAG contrast algorithms.
 
-## Acknowledgements
+## Feedback and Development
 
-The scaling logic and semantic mapping heavily rely on the brilliant architecture of the `modus-themes` package, authored by Protesilaos Stavrou. This package acts as a bridge between dynamic Wayland environments and his meticulous accessibility standards.
+Any feedback is welcome! I am still currently not entirely satisfied with how every color naturally sits depending on the wallpaper. I am actively searching for the perfect mathematical approach to split the selection of colors between a mode optimized for **strict legibility** and another mode optimized for **pure aesthetic beauty**. If you have ideas on HSL scaling or color science algorithms that could improve the styling engine, feel free to share your thoughts or open an issue.
