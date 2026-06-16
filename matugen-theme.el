@@ -137,43 +137,26 @@ If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened."
          (b (+ (* (nth 2 rgb1) alpha) (* (nth 2 rgb2) (- 1.0 alpha)))))
     (matugen-theme--rgb-to-hex (list r g b))))
 
-(defun matugen-theme--hue-distance (h1 h2)
-  "Calculate the shortest distance between two hues on the 360 circle."
-  (let ((diff (abs (- h1 h2))))
-    (if (> diff 0.5) (- 1.0 diff) diff)))
-
-(defun matugen-theme--generate-scientific-wheel (seed-hex is-dark style bg-hex)
-  "Generate a 6-color wheel scientifically offset from SEED-HEX."
-  (let* ((seed-rgb (matugen-theme--hex-to-rgb seed-hex))
-         (seed-hsl (apply #'color-rgb-to-hsl seed-rgb))
-         (h (nth 0 seed-hsl))
-         ;; Target saturations and lightness based on style
-         (s (cond ((eq style 'neon) 1.0)
-                  ((eq style 'harmonized) 0.65)
-                  ((eq style 'background) 0.30)
-                  (t (if is-dark 0.75 0.85))))
-         (l (cond ((eq style 'neon) (if is-dark 0.75 0.40))
-                  (t (if is-dark 0.70 0.40))))
-         ;; Hue targets for standard syntax: Red, Green, Yellow, Blue, Magenta, Cyan
-         (hue-targets '(("red" . 0.0)
-                        ("yellow" . 0.16)
-                        ("green" . 0.33)
-                        ("cyan" . 0.5)
-                        ("blue" . 0.66)
-                        ("magenta" . 0.83)))
-         (wheel nil))
+(defun matugen-theme--apply-style (hex is-dark style bg-hex)
+  "Apply the selected style (neon, harmonized, etc) to a native Matugen HEX colour."
+  (let* ((rgb (matugen-theme--hex-to-rgb hex))
+         (hsl (apply #'color-rgb-to-hsl rgb))
+         (h (nth 0 hsl))
+         (s (nth 1 hsl))
+         (l (nth 2 hsl))
+         
+         (new-s (cond ((eq style 'neon) 1.0)
+                      ((eq style 'background) (* s 0.6))
+                      (t s)))
+         (new-l (cond ((eq style 'neon) (if is-dark 0.75 0.45))
+                      (t l)))
+         
+         (filtered-rgb (color-hsl-to-rgb h new-s new-l))
+         (filtered-hex (matugen-theme--rgb-to-hex filtered-rgb)))
     
-    (dolist (target hue-targets)
-      (let* ((name (car target))
-             (target-h (cdr target))
-             ;; If the seed hue is very close to this target hue, use the seed's exact hue
-             (final-h (if (< (matugen-theme--hue-distance h target-h) 0.08) h target-h))
-             (rgb (color-hsl-to-rgb final-h s l))
-             (base-hex (matugen-theme--rgb-to-hex rgb))
-             ;; If harmonized, blend 30% background into the syntax colors
-             (hex (if (eq style 'harmonized) (matugen-theme--blend base-hex bg-hex 0.7) base-hex)))
-        (push (cons (intern name) hex) wheel)))
-    wheel))
+    (if (eq style 'harmonized)
+        (matugen-theme--blend filtered-hex bg-hex 0.6)
+      filtered-hex)))
 
 (deftheme matugen "Dynamic standalone scientific Matugen theme.")
 
@@ -194,15 +177,29 @@ If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened."
              
              ;; We use palette-1 or foreground as the 'seed' color to generate the wheel
              (seed (or (cdr (assoc 'palette-1 colors)) fg-main))
-             (wheel (matugen-theme--generate-scientific-wheel seed is-dark matugen-theme-style bg))
+             
+             (native-red (or (cdr (assoc 'palette-1 colors)) seed))
+             (native-green (or (cdr (assoc 'palette-2 colors)) seed))
+             (native-yellow (or (cdr (assoc 'palette-3 colors)) seed))
+             (native-blue (or (cdr (assoc 'palette-4 colors)) seed))
+             (native-magenta (or (cdr (assoc 'palette-5 colors)) seed))
+             (native-cyan (or (cdr (assoc 'palette-6 colors)) seed))
+             
+             ;; We apply the Neon/Harmonized style filter to your ACTUAL matugen colors
+             (styled-red (matugen-theme--apply-style native-red is-dark matugen-theme-style bg))
+             (styled-green (matugen-theme--apply-style native-green is-dark matugen-theme-style bg))
+             (styled-yellow (matugen-theme--apply-style native-yellow is-dark matugen-theme-style bg))
+             (styled-blue (matugen-theme--apply-style native-blue is-dark matugen-theme-style bg))
+             (styled-magenta (matugen-theme--apply-style native-magenta is-dark matugen-theme-style bg))
+             (styled-cyan (matugen-theme--apply-style native-cyan is-dark matugen-theme-style bg))
              
              ;; We ensure all syntax colors have perfect contrast against the background
-             (red (matugen-theme--ensure-contrast (cdr (assoc 'red wheel)) bg is-dark 4.5))
-             (green (matugen-theme--ensure-contrast (cdr (assoc 'green wheel)) bg is-dark 4.5))
-             (yellow (matugen-theme--ensure-contrast (cdr (assoc 'yellow wheel)) bg is-dark 4.5))
-             (blue (matugen-theme--ensure-contrast (cdr (assoc 'blue wheel)) bg is-dark 4.5))
-             (magenta (matugen-theme--ensure-contrast (cdr (assoc 'magenta wheel)) bg is-dark 4.5))
-             (cyan (matugen-theme--ensure-contrast (cdr (assoc 'cyan wheel)) bg is-dark 4.5))
+             (red (matugen-theme--ensure-contrast styled-red bg is-dark 4.5))
+             (green (matugen-theme--ensure-contrast styled-green bg is-dark 4.5))
+             (yellow (matugen-theme--ensure-contrast styled-yellow bg is-dark 4.5))
+             (blue (matugen-theme--ensure-contrast styled-blue bg is-dark 4.5))
+             (magenta (matugen-theme--ensure-contrast styled-magenta bg is-dark 4.5))
+             (cyan (matugen-theme--ensure-contrast styled-cyan bg is-dark 4.5))
              
              ;; UI shades
              (bg-alt (matugen-theme--mod-color bg 4 is-dark))
