@@ -45,27 +45,19 @@ It expects a key-value format typically used for terminal emulators."
 - 'background: Inject Matugen backgrounds, but keep native Modus accent colours for optimal code syntax reading.
 - 'harmonized: Inject Matugen backgrounds, and tint the native Modus syntax colours with the background for aesthetic harmony without losing readability.
 - 'neon: Maximum saturation terminal-style colours that jump out against the background for cyberpunk coding speed.
-- 'sci-dark-seed: Pure black background, scientific math generated palette from primary color.
-- 'sci-dark-keyword: Pure black background, primary forced as Keywords, scientific wheel for the rest.
-- 'sci-light-seed: Pure white background, scientific palette.
-- 'sci-light-keyword: Pure white background, primary forced as Keywords.
-- 'sci-tinted-dark-seed: Dark tinted background, scientific palette.
-- 'sci-tinted-dark-keyword: Dark tinted background, primary forced as Keywords.
-- 'sci-tinted-light-seed: Light tinted background, scientific palette.
-- 'sci-tinted-light-keyword: Light tinted background, primary forced as Keywords."
+- 'sci-pure-seed: Pure black/white background (depending on system theme), scientific math generated palette from primary color.
+- 'sci-pure-keyword: Pure black/white background, primary forced as Keywords, scientific wheel for the rest.
+- 'sci-tinted-seed: Tinted dynamic background based on primary color, scientific palette.
+- 'sci-tinted-keyword: Tinted dynamic background, primary forced as Keywords."
   :type '(choice (const :tag "Full (Backgrounds & Accents)" full)
                  (const :tag "Accent only (Native backgrounds)" accent)
                  (const :tag "Background only (Native syntax accents)" background)
                  (const :tag "Harmonized (Tinted syntax & Backgrounds)" harmonized)
                  (const :tag "Neon (100% Saturation Terminal Syntax)" neon)
-                 (const :tag "Sci: Pure Black, Seed Primary" sci-dark-seed)
-                 (const :tag "Sci: Pure Black, Keyword Primary" sci-dark-keyword)
-                 (const :tag "Sci: Pure White, Seed Primary" sci-light-seed)
-                 (const :tag "Sci: Pure White, Keyword Primary" sci-light-keyword)
-                 (const :tag "Sci: Tinted Dark, Seed Primary" sci-tinted-dark-seed)
-                 (const :tag "Sci: Tinted Dark, Keyword Primary" sci-tinted-dark-keyword)
-                 (const :tag "Sci: Tinted Light, Seed Primary" sci-tinted-light-seed)
-                 (const :tag "Sci: Tinted Light, Keyword Primary" sci-tinted-light-keyword))
+                 (const :tag "Sci: Pure BG, Seed Primary" sci-pure-seed)
+                 (const :tag "Sci: Pure BG, Keyword Primary" sci-pure-keyword)
+                 (const :tag "Sci: Tinted BG, Seed Primary" sci-tinted-seed)
+                 (const :tag "Sci: Tinted BG, Keyword Primary" sci-tinted-keyword))
   :group 'matugen-theme)
 
 (defun matugen-theme--get-file-path ()
@@ -279,25 +271,24 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
       (let* ((primary (matugen-theme--find-primary colors))
              
              (use-sci (string-prefix-p "sci-" (symbol-name matugen-theme-style)))
-             (is-sci-dark (string-match-p "dark" (symbol-name matugen-theme-style)))
              (is-sci-tint (string-match-p "tinted" (symbol-name matugen-theme-style)))
              (is-sci-keyword (string-match-p "keyword" (symbol-name matugen-theme-style)))
              
-             (is-dark (if use-sci is-sci-dark (eq (frame-parameter nil 'background-mode) 'dark)))
+             (is-dark (eq (frame-parameter nil 'background-mode) 'dark))
              
              (bg-raw (cond (use-sci 
-                            (cond (is-sci-tint (matugen-theme--mod-color primary (if is-sci-dark -85 90) (not is-sci-dark)))
-                                  (is-sci-dark "#000000")
+                            (cond (is-sci-tint (matugen-theme--mod-color primary (if is-dark -85 90) (not is-dark)))
+                                  (is-dark "#000000")
                                   (t "#ffffff")))
                            (t (or (cdr (assoc 'background colors)) (if is-dark "#000000" "#ffffff")))))
              
-             (fg-main (if use-sci (if is-sci-dark "#ffffff" "#000000") 
+             (fg-main (if use-sci (if is-dark "#ffffff" "#000000") 
                         (or (cdr (assoc 'foreground colors)) (if is-dark "#ffffff" "#000000"))))
              
              (use-harm (eq matugen-theme-style 'harmonized))
              (use-neon (eq matugen-theme-style 'neon))
              
-             (sci-wheel (when use-sci (matugen-theme--generate-scientific-wheel primary is-sci-dark)))
+             (sci-wheel (when use-sci (matugen-theme--generate-scientific-wheel primary is-dark)))
              (sci-map (when use-sci (matugen-theme--match-hue-semantics sci-wheel)))
              
              (all-syntax-colors (if use-sci
@@ -453,10 +444,8 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
   (if (require 'consult nil t)
       (let* ((original-style matugen-theme-style)
              (styles '(full accent background harmonized neon 
-                            sci-dark-seed sci-dark-keyword 
-                            sci-light-seed sci-light-keyword 
-                            sci-tinted-dark-seed sci-tinted-dark-keyword 
-                            sci-tinted-light-seed sci-tinted-light-keyword))
+                            sci-pure-seed sci-pure-keyword 
+                            sci-tinted-seed sci-tinted-keyword))
              (selected
               (consult--read (mapcar #'symbol-name styles)
                              :prompt "Matugen Style: "
@@ -474,7 +463,7 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
         (when selected
           (setq matugen-theme-style (intern selected))
           (matugen-theme-reload)))
-    (let* ((styles '(full accent background harmonized neon sci-dark-seed sci-dark-keyword sci-light-seed sci-light-keyword sci-tinted-dark-seed sci-tinted-dark-keyword sci-tinted-light-seed sci-tinted-light-keyword))
+    (let* ((styles '(full accent background harmonized neon sci-pure-seed sci-pure-keyword sci-tinted-seed sci-tinted-keyword))
            (selection (completing-read "Select Matugen Style: " (mapcar #'symbol-name styles) nil t)))
       (when selection
         (setq matugen-theme-style (intern selection))

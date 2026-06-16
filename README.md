@@ -6,10 +6,10 @@ It is particularly well-suited for dynamic ricing environments on Wayland compos
 
 ## Features
 
+- **Scientific Colour Engine:** Mathematically generates 6 perfect syntax colours by rotating the Hue of your primary Matugen color. It then tests and recursively darkens/lightens your background to guarantee a 4.5:1 WCAG contrast ratio for every syntax element.
+- **Interactive Style Previews:** Run `M-x matugen-theme-select-style` to instantly test different cyberpunk or scientific aesthetics in real-time.
 - **Dynamic Theme Switching:** Actively monitors a designated colour palette file and updates the Emacs theme in real-time, without requiring an editor restart.
-- **Luminance Detection:** Automatically switches between `modus-operandi` (light) and `modus-vivendi` (dark) by mathematically calculating the relative luminance of the generated background colour.
-- **AAA Contrast Preservation:** Modus Themes are renowned for their strict accessibility guidelines. This package mathematically scales the Matugen colours (lightening or darkening them depending on the base theme) to preserve readability, ensuring that code syntax and UI elements remain perfectly legible.
-- **Comprehensive Integration:** Overrides core UI elements such as the mode-line, the current line highlight, and automatically reloads `solaire-mode` to prevent face clashing.
+- **Comprehensive Integration:** Natively overrides core UI elements such as the mode-line, current line highlight, and prevents face clashing across Emacs packages.
 
 ## Installation and Configuration
 
@@ -27,13 +27,20 @@ You can install and configure `matugen-theme` using `use-package` and `package-v
     
   :custom
   ;; Point this to the configuration file Matugen continually overwrites.
-  ;; By default, the package looks for:
   (matugen-theme-colors-file (expand-file-name "~/.config/emacs/matugen-colors.conf"))
+  
+  ;; Choose your preferred aesthetic style
+  (matugen-theme-style 'sci-tinted-keyword)
   
   :config
   ;; Enable the global minor mode to start watching the directory.
   (matugen-theme-mode 1))
 ```
+
+### Changing Styles Interactively
+You don't need to manually edit your config file to try out different aesthetics. Simply run:
+`M-x matugen-theme-select-style`
+As you scroll through the list, your Emacs will instantly change colours in real-time to preview the style. Press `ENTER` to apply it.
 
 ## Matugen Template Configuration
 
