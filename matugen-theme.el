@@ -44,20 +44,12 @@ It expects a key-value format typically used for terminal emulators."
 - 'accent: Keep the native Modus Themes backgrounds, but inject Matugen accent colours.
 - 'background: Inject Matugen backgrounds, but keep native Modus accent colours for optimal code syntax reading.
 - 'harmonized: Inject Matugen backgrounds, and tint the native Modus syntax colours with the background for aesthetic harmony without losing readability.
-- 'neon: Maximum saturation terminal-style colours that jump out against the background for cyberpunk coding speed.
-- 'sci-pure-seed: Pure black/white background (depending on system theme), scientific math generated palette from primary color.
-- 'sci-pure-keyword: Pure black/white background, primary forced as Keywords, scientific wheel for the rest.
-- 'sci-tinted-seed: Tinted dynamic background based on primary color, scientific palette.
-- 'sci-tinted-keyword: Tinted dynamic background, primary forced as Keywords."
+- 'neon: Maximum saturation terminal-style colours that jump out against the background for cyberpunk coding speed."
   :type '(choice (const :tag "Full (Backgrounds & Accents)" full)
                  (const :tag "Accent only (Native backgrounds)" accent)
                  (const :tag "Background only (Native syntax accents)" background)
                  (const :tag "Harmonized (Tinted syntax & Backgrounds)" harmonized)
-                 (const :tag "Neon (100% Saturation Terminal Syntax)" neon)
-                 (const :tag "Sci: Pure BG, Seed Primary" sci-pure-seed)
-                 (const :tag "Sci: Pure BG, Keyword Primary" sci-pure-keyword)
-                 (const :tag "Sci: Tinted BG, Seed Primary" sci-tinted-seed)
-                 (const :tag "Sci: Tinted BG, Keyword Primary" sci-tinted-keyword))
+                 (const :tag "Neon (100% Saturation Terminal Syntax)" neon))
   :group 'matugen-theme)
 
 (defun matugen-theme--get-file-path ()
@@ -118,49 +110,6 @@ An ALPHA of 1.0 returns exactly HEX1. An ALPHA of 0.0 returns exactly HEX2."
          (l (if is-dark 0.75 0.35)))
     (matugen-theme--rgb-to-hex (color-hsl-to-rgb h s l))))
 
-(defun matugen-theme--hue-distance (h1 h2)
-  "Calculate the shortest distance between two hues on a 360 degree circle."
-  (let ((diff (abs (- h1 h2))))
-    (if (> diff 180.0)
-        (- 360.0 diff)
-      diff)))
-
-(defun matugen-theme--generate-scientific-wheel (primary-hex is-dark)
-  "Generate a 6-color wheel from PRIMARY-HEX, adjusted for contrast against BG."
-  (let* ((rgb (matugen-theme--hex-to-rgb primary-hex))
-         (hsl (apply #'color-rgb-to-hsl rgb))
-         (h (nth 0 hsl))
-         (colors '()))
-    (dotimes (i 6)
-      (let* ((h-deg (* h 360.0))
-             (new-h-deg (mod (+ h-deg (* i 60.0)) 360.0))
-             (new-h (/ new-h-deg 360.0))
-             (new-s 0.85)
-             (new-l (if is-dark 0.70 0.40))
-             (new-hex (matugen-theme--rgb-to-hex (color-hsl-to-rgb new-h new-s new-l))))
-        (push (cons new-h-deg new-hex) colors)))
-    (nreverse colors)))
-
-(defun matugen-theme--match-hue-semantics (wheel)
-  "Map the generated WHEEL (list of (hue-deg . hex)) to semantic colors."
-  (let ((targets '((red . 0.0) (yellow . 60.0) (green . 120.0) 
-                   (cyan . 180.0) (blue . 240.0) (magenta . 300.0)))
-        (mapped '())
-        (available (copy-sequence wheel)))
-    (dolist (target targets)
-      (let ((target-name (car target))
-            (target-hue (cdr target))
-            (best-match nil)
-            (best-dist 1000.0))
-        (dolist (color available)
-          (let ((dist (matugen-theme--hue-distance target-hue (car color))))
-            (when (< dist best-dist)
-              (setq best-dist dist)
-              (setq best-match color))))
-        (push (cons target-name (cdr best-match)) mapped)
-        (setq available (delete best-match available))))
-    mapped))
-
 (defun matugen-theme--mod-color (hex percent lighten)
   "Lighten or darken a HEX colour by PERCENT (0-100).
 If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened.
@@ -183,25 +132,6 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
          (b (nth 2 rgb-hex)))
     (matugen-theme--relative-luminance r g b)))
 
-(defun matugen-theme--find-primary (colors)
-  "Find the primary color, or fallback to the most saturated from palette-1..6."
-  (let ((prim (cdr (assoc 'primary colors))))
-    (if prim
-        prim
-      (let ((best-s -1)
-            (best-color "#ffffff"))
-        (dotimes (i 6)
-          (let* ((sym (intern (format "palette-%d" (1+ i))))
-                 (hex (cdr (assoc sym colors))))
-            (when hex
-              (let* ((rgb (matugen-theme--hex-to-rgb hex))
-                     (hsl (apply #'color-rgb-to-hsl rgb))
-                     (s (nth 1 hsl)))
-                (when (> s best-s)
-                  (setq best-s s)
-                  (setq best-color hex))))))
-        best-color))))
-
 (defun matugen-theme--relative-luminance (r g b)
   "Calculate relative luminance."
   (let ((sR (if (<= r 0.03928) (/ r 12.92) (expt (/ (+ r 0.055) 1.055) 2.4)))
@@ -212,29 +142,6 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
 (defun matugen-theme--contrast-ratio-luminance (l1 l2)
   "Calculate contrast ratio between two luminance values."
   (/ (+ (max l1 l2) 0.05) (+ (min l1 l2) 0.05)))
-
-(defun matugen-theme--ensure-bg-legibility (bg-hex colors-list is-dark)
-  "Push BG-HEX iteratively to dark/light until it has at least 4.5 contrast against all COLORS-LIST."
-  (let ((current-bg bg-hex)
-        (valid nil)
-        (iterations 0)
-        (max-iters 50))
-    (while (and (not valid) (< iterations max-iters))
-      (let ((all-good t))
-        (dolist (color colors-list)
-          (when color
-            (let* ((c1 (matugen-theme--hex-to-rgb color))
-                   (c2 (matugen-theme--hex-to-rgb current-bg))
-                   (l1 (matugen-theme--relative-luminance (nth 0 c1) (nth 1 c1) (nth 2 c1)))
-                   (l2 (matugen-theme--relative-luminance (nth 0 c2) (nth 1 c2) (nth 2 c2)))
-                   (ratio (matugen-theme--contrast-ratio-luminance l1 l2)))
-              (when (< ratio 4.5)
-                (setq all-good nil)))))
-        (if all-good
-            (setq valid t)
-          (setq current-bg (matugen-theme--mod-color current-bg 2 (not is-dark)))
-          (setq iterations (1+ iterations)))))
-    current-bg))
 
 (defun matugen-theme--luminance (hex)
   "Calculate relative luminance of a HEX colour."
@@ -268,39 +175,13 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
   (interactive)
   (let ((colors (matugen-theme--read-palette)))
     (when colors
-      (let* ((primary (matugen-theme--find-primary colors))
+      (let* ((is-dark (eq (frame-parameter nil 'background-mode) 'dark))
              
-             (use-sci (string-prefix-p "sci-" (symbol-name matugen-theme-style)))
-             (is-sci-tint (string-match-p "tinted" (symbol-name matugen-theme-style)))
-             (is-sci-keyword (string-match-p "keyword" (symbol-name matugen-theme-style)))
-             
-             (is-dark (eq (frame-parameter nil 'background-mode) 'dark))
-             
-             (bg-raw (cond (use-sci 
-                            (cond (is-sci-tint (matugen-theme--mod-color primary (if is-dark -85 90) (not is-dark)))
-                                  (is-dark "#000000")
-                                  (t "#ffffff")))
-                           (t (or (cdr (assoc 'background colors)) (if is-dark "#000000" "#ffffff")))))
-             
-             (fg-main (if use-sci (if is-dark "#ffffff" "#000000") 
-                        (or (cdr (assoc 'foreground colors)) (if is-dark "#ffffff" "#000000"))))
+             (bg (or (cdr (assoc 'background colors)) (if is-dark "#000000" "#ffffff")))
+             (fg-main (or (cdr (assoc 'foreground colors)) (if is-dark "#ffffff" "#000000")))
              
              (use-harm (eq matugen-theme-style 'harmonized))
              (use-neon (eq matugen-theme-style 'neon))
-             
-             (sci-wheel (when use-sci (matugen-theme--generate-scientific-wheel primary is-dark)))
-             (sci-map (when use-sci (matugen-theme--match-hue-semantics sci-wheel)))
-             
-             (all-syntax-colors (if use-sci
-                                    (list (cdr (assoc 'red sci-map)) (cdr (assoc 'green sci-map)) 
-                                          (cdr (assoc 'yellow sci-map)) (cdr (assoc 'blue sci-map)) 
-                                          (if is-sci-keyword primary (cdr (assoc 'magenta sci-map))) 
-                                          (cdr (assoc 'cyan sci-map)))
-                                  nil))
-             
-             (bg (if use-sci
-                     (matugen-theme--ensure-bg-legibility bg-raw all-syntax-colors is-dark)
-                   bg-raw))
              
              (modus-red (if is-dark "#ff5f59" "#a60000"))
              (modus-green (if is-dark "#44df44" "#006800"))
@@ -309,41 +190,35 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
              (modus-magenta (if is-dark "#fe46ba" "#721045"))
              (modus-cyan (if is-dark "#00d3d0" "#005e8b"))
              
-             (red-raw (cond (use-sci (cdr (assoc 'red sci-map)))
-                            (use-harm (matugen-theme--blend modus-red bg 0.70))
+             (red-raw (cond (use-harm (matugen-theme--blend modus-red bg 0.70))
                             (use-neon (matugen-theme--neonize modus-red is-dark))
                             (t (or (cdr (assoc 'red colors)) (cdr (assoc 'palette-1 colors)) bg))))
-             (red (if (or use-neon use-sci) red-raw (matugen-theme--ensure-contrast red-raw bg is-dark 4.5)))
+             (red (if use-neon red-raw (matugen-theme--ensure-contrast red-raw bg is-dark 4.5)))
              
-             (green-raw (cond (use-sci (cdr (assoc 'green sci-map)))
-                              (use-harm (matugen-theme--blend modus-green bg 0.70))
+             (green-raw (cond (use-harm (matugen-theme--blend modus-green bg 0.70))
                               (use-neon (matugen-theme--neonize modus-green is-dark))
                               (t (or (cdr (assoc 'green colors)) (cdr (assoc 'palette-2 colors)) bg))))
-             (green (if (or use-neon use-sci) green-raw (matugen-theme--ensure-contrast green-raw bg is-dark 4.5)))
+             (green (if use-neon green-raw (matugen-theme--ensure-contrast green-raw bg is-dark 4.5)))
              
-             (yellow-raw (cond (use-sci (cdr (assoc 'yellow sci-map)))
-                               (use-harm (matugen-theme--blend modus-yellow bg 0.70))
+             (yellow-raw (cond (use-harm (matugen-theme--blend modus-yellow bg 0.70))
                                (use-neon (matugen-theme--neonize modus-yellow is-dark))
                                (t (or (cdr (assoc 'yellow colors)) (cdr (assoc 'palette-3 colors)) bg))))
-             (yellow (if (or use-neon use-sci) yellow-raw (matugen-theme--ensure-contrast yellow-raw bg is-dark 4.5)))
+             (yellow (if use-neon yellow-raw (matugen-theme--ensure-contrast yellow-raw bg is-dark 4.5)))
              
-             (blue-raw (cond (use-sci (cdr (assoc 'blue sci-map)))
-                             (use-harm (matugen-theme--blend modus-blue bg 0.70))
+             (blue-raw (cond (use-harm (matugen-theme--blend modus-blue bg 0.70))
                              (use-neon (matugen-theme--neonize modus-blue is-dark))
                              (t (or (cdr (assoc 'blue colors)) (cdr (assoc 'palette-4 colors)) bg))))
-             (blue (if (or use-neon use-sci) blue-raw (matugen-theme--ensure-contrast blue-raw bg is-dark 4.5)))
+             (blue (if use-neon blue-raw (matugen-theme--ensure-contrast blue-raw bg is-dark 4.5)))
              
-             (magenta-raw (cond (use-sci (if is-sci-keyword primary (cdr (assoc 'magenta sci-map))))
-                                (use-harm (matugen-theme--blend modus-magenta bg 0.70))
+             (magenta-raw (cond (use-harm (matugen-theme--blend modus-magenta bg 0.70))
                                 (use-neon (matugen-theme--neonize modus-magenta is-dark))
                                 (t (or (cdr (assoc 'magenta colors)) (cdr (assoc 'palette-5 colors)) bg))))
-             (magenta (if (or use-neon use-sci) magenta-raw (matugen-theme--ensure-contrast magenta-raw bg is-dark 4.5)))
+             (magenta (if use-neon magenta-raw (matugen-theme--ensure-contrast magenta-raw bg is-dark 4.5)))
              
-             (cyan-raw (cond (use-sci (cdr (assoc 'cyan sci-map)))
-                             (use-harm (matugen-theme--blend modus-cyan bg 0.70))
+             (cyan-raw (cond (use-harm (matugen-theme--blend modus-cyan bg 0.70))
                              (use-neon (matugen-theme--neonize modus-cyan is-dark))
                              (t (or (cdr (assoc 'cyan colors)) (cdr (assoc 'palette-6 colors)) bg))))
-             (cyan (if (or use-neon use-sci) cyan-raw (matugen-theme--ensure-contrast cyan-raw bg is-dark 4.5)))
+             (cyan (if use-neon cyan-raw (matugen-theme--ensure-contrast cyan-raw bg is-dark 4.5)))
              
              ;; Force Emacs to adopt the appropriate Modus base theme.
              (base-theme (if is-dark 'modus-vivendi 'modus-operandi))
@@ -439,13 +314,11 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
 
 ;;;###autoload
 (defun matugen-theme-select-style ()
-  "Interactively select a matugen theme style with live preview via consult."
+  "Interactively select and preview a Matugen theme style."
   (interactive)
   (if (require 'consult nil t)
       (let* ((original-style matugen-theme-style)
-             (styles '(full accent background harmonized neon 
-                            sci-pure-seed sci-pure-keyword 
-                            sci-tinted-seed sci-tinted-keyword))
+             (styles '(full accent background harmonized neon))
              (selected
               (consult--read (mapcar #'symbol-name styles)
                              :prompt "Matugen Style: "
@@ -463,7 +336,7 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
         (when selected
           (setq matugen-theme-style (intern selected))
           (matugen-theme-reload)))
-    (let* ((styles '(full accent background harmonized neon sci-pure-seed sci-pure-keyword sci-tinted-seed sci-tinted-keyword))
+    (let* ((styles '(full accent background harmonized neon))
            (selection (completing-read "Select Matugen Style: " (mapcar #'symbol-name styles) nil t)))
       (when selection
         (setq matugen-theme-style (intern selection))
