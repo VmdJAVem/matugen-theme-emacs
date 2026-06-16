@@ -42,10 +42,12 @@ It expects a key-value format typically used for terminal emulators."
   "Style of the Matugen integration.
 - 'full: Override both backgrounds and accents using Matugen colours.
 - 'accent: Keep the native Modus Themes backgrounds, but inject Matugen accent colours.
-- 'background: Inject Matugen backgrounds, but keep native Modus accent colours for optimal code syntax reading."
+- 'background: Inject Matugen backgrounds, but keep native Modus accent colours for optimal code syntax reading.
+- 'generated-syntax: Uses the primary Matugen colour's saturation to mathematically generate 5 harmonized semantic colours (red, yellow, cyan, etc) for coding."
   :type '(choice (const :tag "Full (Backgrounds & Accents)" full)
                  (const :tag "Accent only (Native backgrounds)" accent)
-                 (const :tag "Background only (Native syntax accents)" background))
+                 (const :tag "Background only (Native syntax accents)" background)
+                 (const :tag "Generated syntax colours based on seed" generated-syntax))
   :group 'matugen-theme)
 
 (defun matugen-theme--get-file-path ()
@@ -156,18 +158,35 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
              
              (fg-main (or (cdr (assoc 'foreground colors)) (if is-dark "#ffffff" "#000000")))
              
+             ;; Extract Raw Colors
              (red-raw (or (cdr (assoc 'red colors)) (cdr (assoc 'palette-1 colors)) bg))
-             (red (matugen-theme--ensure-contrast red-raw bg is-dark 4.5))
              (green-raw (or (cdr (assoc 'green colors)) (cdr (assoc 'palette-2 colors)) bg))
-             (green (matugen-theme--ensure-contrast green-raw bg is-dark 4.5))
              (yellow-raw (or (cdr (assoc 'yellow colors)) (cdr (assoc 'palette-3 colors)) bg))
-             (yellow (matugen-theme--ensure-contrast yellow-raw bg is-dark 4.5))
              (blue-raw (or (cdr (assoc 'blue colors)) (cdr (assoc 'palette-4 colors)) bg))
-             (blue (matugen-theme--ensure-contrast blue-raw bg is-dark 4.5))
              (magenta-raw (or (cdr (assoc 'magenta colors)) (cdr (assoc 'palette-5 colors)) bg))
-             (magenta (matugen-theme--ensure-contrast magenta-raw bg is-dark 4.5))
              (cyan-raw (or (cdr (assoc 'cyan colors)) (cdr (assoc 'palette-6 colors)) bg))
-             (cyan (matugen-theme--ensure-contrast cyan-raw bg is-dark 4.5))
+
+             ;; Generation logic based on 'blue-raw' (which is palette-4 / standard seed)
+             (primary-hsl (apply #'color-rgb-to-hsl (matugen-theme--hex-to-rgb blue-raw)))
+             (psat (nth 1 primary-hsl))
+             (plum (nth 2 primary-hsl))
+             
+             (gen-red-raw (matugen-theme--rgb-to-hex (color-hsl-to-rgb (/ 0.0 360.0) psat plum)))
+             (gen-yellow-raw (matugen-theme--rgb-to-hex (color-hsl-to-rgb (/ 60.0 360.0) psat plum)))
+             (gen-green-raw (matugen-theme--rgb-to-hex (color-hsl-to-rgb (/ 120.0 360.0) psat plum)))
+             (gen-cyan-raw (matugen-theme--rgb-to-hex (color-hsl-to-rgb (/ 180.0 360.0) psat plum)))
+             (gen-blue-raw (matugen-theme--rgb-to-hex (color-hsl-to-rgb (/ 240.0 360.0) psat plum)))
+             (gen-magenta-raw (matugen-theme--rgb-to-hex (color-hsl-to-rgb (/ 300.0 360.0) psat plum)))
+
+             (use-gen (eq matugen-theme-style 'generated-syntax))
+
+             ;; Determine final raw color (Matugen extracted vs Math generated) and ensure WCAG AAA 4.5 contrast
+             (red (matugen-theme--ensure-contrast (if use-gen gen-red-raw red-raw) bg is-dark 4.5))
+             (green (matugen-theme--ensure-contrast (if use-gen gen-green-raw green-raw) bg is-dark 4.5))
+             (yellow (matugen-theme--ensure-contrast (if use-gen gen-yellow-raw yellow-raw) bg is-dark 4.5))
+             (blue (matugen-theme--ensure-contrast (if use-gen gen-blue-raw blue-raw) bg is-dark 4.5))
+             (magenta (matugen-theme--ensure-contrast (if use-gen gen-magenta-raw magenta-raw) bg is-dark 4.5))
+             (cyan (matugen-theme--ensure-contrast (if use-gen gen-cyan-raw cyan-raw) bg is-dark 4.5))
              
              ;; Force Emacs to adopt the appropriate Modus base theme.
              (base-theme (if is-dark 'modus-vivendi 'modus-operandi))
@@ -227,6 +246,7 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
           (setq modus-themes-common-palette-overrides
                 (cond ((eq matugen-theme-style 'accent) accent-overrides)
                       ((eq matugen-theme-style 'background) bg-overrides)
+                      ((eq matugen-theme-style 'generated-syntax) (append bg-overrides accent-overrides))
                       (t (append bg-overrides accent-overrides)))))
         
         ;; Purge all currently active themes to prevent face clashing
