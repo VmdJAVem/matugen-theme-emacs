@@ -38,6 +38,14 @@ It expects a key-value format typically used for terminal emulators."
   :type 'file
   :group 'matugen-theme)
 
+(defcustom matugen-theme-style 'full
+  "Style of the Matugen integration.
+- 'full: Override both backgrounds and accents using Matugen colours.
+- 'accent: Keep the native Modus Themes backgrounds, but inject Matugen accent colours."
+  :type '(choice (const :tag "Full (Backgrounds & Accents)" full)
+                 (const :tag "Accent only (Native backgrounds)" accent))
+  :group 'matugen-theme)
+
 (defun matugen-theme--get-file-path ()
   "Return the Matugen file path. Fallbacks to dankcolors if the primary doesn't exist."
   (if (file-exists-p matugen-theme-colors-file)
@@ -173,46 +181,51 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
              (bg-mode-inactive (matugen-theme--mod-color bg 12 is-dark))
              (border-mode (matugen-theme--mod-color bg 30 is-dark))
              
-             (fg-dim (matugen-theme--mod-color fg 20 (not is-dark))))
+             (fg-dim (matugen-theme--mod-color fg-main 20 (not is-dark))))
         
         ;; Palette adjustments with mathematical scaling to preserve legibility
-        (setq modus-themes-common-palette-overrides
-              `((bg-main ,bg)
-                (fg-main ,fg)
-                (bg-dim ,bg-dim)
-                (bg-alt ,bg-alt)
-                (bg-active ,bg-active)
-                (bg-inactive ,bg-dim)
-                (border ,bg-alt)
-                (fg-dim ,fg-dim)
-                
-                ;; Highlights and Modeline
-                (bg-hl-line ,bg-hl)
-                (bg-region ,bg-region)
-                (bg-mode-line-active ,bg-mode-active)
-                (bg-mode-line-inactive ,bg-mode-inactive)
-                (border-mode-line-active ,border-mode)
-                (border-mode-line-inactive ,border-mode)
-                
-                ;; Base semantic colours
-                (blue ,primary)
-                (cyan ,secondary)
-                (magenta ,tertiary)
-                (red ,error)
-                (green ,green)
-                (yellow ,yellow)
-                
-                ;; Variants tailored for code syntax highlighting
-                (blue-cooler ,(matugen-theme--mod-color primary 15 nil))
-                (blue-warmer ,(matugen-theme--mod-color primary 15 t))
-                (magenta-cooler ,(matugen-theme--mod-color tertiary 15 nil))
-                (magenta-warmer ,(matugen-theme--mod-color tertiary 15 t))
-                (red-cooler ,(matugen-theme--mod-color error 15 nil))
-                (red-warmer ,(matugen-theme--mod-color error 15 t))
-                (green-cooler ,(matugen-theme--mod-color green 15 nil))
-                (green-warmer ,(matugen-theme--mod-color green 15 t))
-                (yellow-cooler ,(matugen-theme--mod-color yellow 15 nil))
-                (yellow-warmer ,(matugen-theme--mod-color yellow 15 t))))
+        (let* ((accent-overrides
+                `((blue ,blue)
+                  (cyan ,cyan)
+                  (magenta ,magenta)
+                  (red ,red)
+                  (green ,green)
+                  (yellow ,yellow)
+                  
+                  ;; Variants tailored for code syntax highlighting
+                  (blue-cooler ,(matugen-theme--mod-color blue 15 nil))
+                  (blue-warmer ,(matugen-theme--mod-color blue 15 t))
+                  (magenta-cooler ,(matugen-theme--mod-color magenta 15 nil))
+                  (magenta-warmer ,(matugen-theme--mod-color magenta 15 t))
+                  (red-cooler ,(matugen-theme--mod-color red 15 nil))
+                  (red-warmer ,(matugen-theme--mod-color red 15 t))
+                  (green-cooler ,(matugen-theme--mod-color green 15 nil))
+                  (green-warmer ,(matugen-theme--mod-color green 15 t))
+                  (yellow-cooler ,(matugen-theme--mod-color yellow 15 nil))
+                  (yellow-warmer ,(matugen-theme--mod-color yellow 15 t))))
+               
+               (bg-overrides
+                `((bg-main ,bg)
+                  (fg-main ,fg-main)
+                  (bg-dim ,bg-dim)
+                  (bg-alt ,bg-alt)
+                  (bg-active ,bg-active)
+                  (bg-inactive ,bg-dim)
+                  (border ,bg-alt)
+                  (fg-dim ,fg-dim)
+                  
+                  ;; Highlights and Modeline
+                  (bg-hl-line ,bg-hl)
+                  (bg-region ,bg-region)
+                  (bg-mode-line-active ,bg-mode-active)
+                  (bg-mode-line-inactive ,bg-mode-inactive)
+                  (border-mode-line-active ,border-mode)
+                  (border-mode-line-inactive ,border-mode))))
+          
+          (setq modus-themes-common-palette-overrides
+                (if (eq matugen-theme-style 'accent)
+                    accent-overrides
+                  (append bg-overrides accent-overrides))))
         
         ;; Purge all currently active themes to prevent face clashing
         (mapc #'disable-theme custom-enabled-themes)
