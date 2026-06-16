@@ -291,8 +291,9 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
         ;; Purge all currently active themes to prevent face clashing
         (mapc #'disable-theme custom-enabled-themes)
         
-        ;; Load the appropriate Modus base
-        (load-theme base-theme t)
+        ;; Load the appropriate Modus base. This specific function MUST be used instead of standard
+        ;; load-theme so Modus recalculates the faces using our modus-themes-common-palette-overrides.
+        (modus-themes-load-theme base-theme)
         
         (when (fboundp 'doom/reload-theme)
           (doom/reload-theme))
