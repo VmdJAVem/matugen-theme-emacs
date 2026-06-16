@@ -38,22 +38,30 @@ It expects a key-value format typically used for terminal emulators."
   :type 'file
   :group 'matugen-theme)
 
+(defun matugen-theme--get-file-path ()
+  "Return the Matugen file path. Fallbacks to dankcolors if the primary doesn't exist."
+  (if (file-exists-p matugen-theme-colors-file)
+      matugen-theme-colors-file
+    (let ((fallback (expand-file-name "~/.config/ghostty/themes/dankcolors")))
+      (if (file-exists-p fallback) fallback matugen-theme-colors-file))))
+
 (defvar matugen-theme--file-watch-descriptor nil
   "Descriptor for the active file system watcher.")
 
 (defun matugen-theme--read-palette ()
   "Parse the Matugen generated file and return an alist of colours."
-  (when (file-exists-p matugen-theme-colors-file)
-    (let ((colors nil))
-      (with-temp-buffer
-        (insert-file-contents matugen-theme-colors-file)
-        (goto-char (point-min))
-        (while (re-search-forward "^\\([a-z-]+\\) = \\(#[0-9a-fA-F]+\\)" nil t)
-          (push (cons (intern (match-string 1)) (match-string 2)) colors))
-        (goto-char (point-min))
-        (while (re-search-forward "^palette = \\([0-9]+\\)=\\(#[0-9a-fA-F]+\\)" nil t)
-          (push (cons (intern (format "palette-%s" (match-string 1))) (match-string 2)) colors)))
-      colors)))
+  (let ((target-file (matugen-theme--get-file-path)))
+    (when (file-exists-p target-file)
+      (let ((colors nil))
+        (with-temp-buffer
+          (insert-file-contents target-file)
+          (goto-char (point-min))
+          (while (re-search-forward "^\\([a-z-]+\\) = \\(#[0-9a-fA-F]+\\)" nil t)
+            (push (cons (intern (match-string 1)) (match-string 2)) colors))
+          (goto-char (point-min))
+          (while (re-search-forward "^palette = \\([0-9]+\\)=\\(#[0-9a-fA-F]+\\)" nil t)
+            (push (cons (intern (format "palette-%s" (match-string 1))) (match-string 2)) colors)))
+        colors))))
 
 (defun matugen-theme--mod-color (hex percent lighten)
   "Lighten or darken a HEX colour by PERCENT (0-100).
@@ -155,6 +163,11 @@ If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened."
         (when (featurep 'solaire-mode)
           (solaire-global-mode -1)
           (solaire-global-mode 1))
+        
+        ;; Force hl-line-mode to reset and flush its face cache
+        (when (bound-and-true-p global-hl-line-mode)
+          (global-hl-line-mode -1)
+          (global-hl-line-mode 1))
           
         (message "Matugen-Theme: Automatically loaded colours from Matugen.")))))
 
@@ -163,7 +176,7 @@ If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened."
   (let ((file (nth 2 event)))
     (when (and (stringp file)
                (string= (file-name-nondirectory file)
-                        (file-name-nondirectory matugen-theme-colors-file)))
+                        (file-name-nondirectory (matugen-theme--get-file-path))))
       (matugen-theme-reload))))
 
 ;;;###autoload
@@ -173,13 +186,13 @@ If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened."
   :lighter " Matugen"
   (if matugen-theme-mode
       (progn
-        (when (file-exists-p matugen-theme-colors-file)
+        (when (file-exists-p (matugen-theme--get-file-path))
           (if after-init-time
               (matugen-theme-reload)
             (add-hook 'emacs-startup-hook #'matugen-theme-reload)))
         
         (unless matugen-theme--file-watch-descriptor
-          (let ((dir (file-name-directory matugen-theme-colors-file)))
+          (let ((dir (file-name-directory (matugen-theme--get-file-path))))
             (unless (file-exists-p dir)
               (make-directory dir t))
             (setq matugen-theme--file-watch-descriptor
