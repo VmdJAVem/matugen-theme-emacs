@@ -42,10 +42,12 @@ It expects a key-value format typically used for terminal emulators."
   "Style of the Matugen integration.
 - 'full: Override both backgrounds and accents using Matugen colours.
 - 'accent: Keep the native Modus Themes backgrounds, but inject Matugen accent colours.
-- 'background: Inject Matugen backgrounds, but keep native Modus accent colours for optimal code syntax reading."
+- 'background: Inject Matugen backgrounds, but keep native Modus accent colours for optimal code syntax reading.
+- 'harmonized: Inject Matugen backgrounds, and tint the native Modus syntax colours with the background for aesthetic harmony without losing readability."
   :type '(choice (const :tag "Full (Backgrounds & Accents)" full)
                  (const :tag "Accent only (Native backgrounds)" accent)
-                 (const :tag "Background only (Native syntax accents)" background))
+                 (const :tag "Background only (Native syntax accents)" background)
+                 (const :tag "Harmonized (Tinted syntax & Backgrounds)" harmonized))
   :group 'matugen-theme)
 
 (defun matugen-theme--get-file-path ()
@@ -74,18 +76,28 @@ It expects a key-value format typically used for terminal emulators."
         colors))))
 
 (defun matugen-theme--hex-to-rgb (hex)
-  "Convert a 6-character HEX colour to an RGB list (0.0 - 1.0) independent of the frame."
+  "Convert HEX color string to a list of (R G B) components from 0.0 to 1.0."
   (let ((r (/ (string-to-number (substring hex 1 3) 16) 255.0))
         (g (/ (string-to-number (substring hex 3 5) 16) 255.0))
         (b (/ (string-to-number (substring hex 5 7) 16) 255.0)))
     (list r g b)))
 
 (defun matugen-theme--rgb-to-hex (rgb)
-  "Convert an RGB list (0.0 - 1.0) back to a 6-character HEX string."
+  "Convert list of (R G B) components from 0.0 to 1.0 back to a HEX string."
   (format "#%02x%02x%02x"
           (max 0 (min 255 (round (* (nth 0 rgb) 255))))
           (max 0 (min 255 (round (* (nth 1 rgb) 255))))
           (max 0 (min 255 (round (* (nth 2 rgb) 255))))))
+
+(defun matugen-theme--blend (hex1 hex2 alpha)
+  "Blend HEX1 into HEX2 with ALPHA (0.0 to 1.0).
+An ALPHA of 1.0 returns exactly HEX1. An ALPHA of 0.0 returns exactly HEX2."
+  (let* ((rgb1 (matugen-theme--hex-to-rgb hex1))
+         (rgb2 (matugen-theme--hex-to-rgb hex2))
+         (r (+ (* (nth 0 rgb1) alpha) (* (nth 0 rgb2) (- 1.0 alpha))))
+         (g (+ (* (nth 1 rgb1) alpha) (* (nth 1 rgb2) (- 1.0 alpha))))
+         (b (+ (* (nth 2 rgb1) alpha) (* (nth 2 rgb2) (- 1.0 alpha)))))
+    (matugen-theme--rgb-to-hex (list r g b))))
 
 (defun matugen-theme--mod-color (hex percent lighten)
   "Lighten or darken a HEX colour by PERCENT (0-100).
@@ -156,17 +168,37 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
              
              (fg-main (or (cdr (assoc 'foreground colors)) (if is-dark "#ffffff" "#000000")))
              
-             (red-raw (or (cdr (assoc 'red colors)) (cdr (assoc 'palette-1 colors)) bg))
+             (use-harm (eq matugen-theme-style 'harmonized))
+             
+             (modus-red (if is-dark "#ff5f59" "#a60000"))
+             (modus-green (if is-dark "#44df44" "#006800"))
+             (modus-yellow (if is-dark "#efef00" "#6f5500"))
+             (modus-blue (if is-dark "#2fafff" "#0031a9"))
+             (modus-magenta (if is-dark "#fe46ba" "#721045"))
+             (modus-cyan (if is-dark "#00d3d0" "#005e8b"))
+             
+             (red-raw (if use-harm (matugen-theme--blend modus-red bg 0.70)
+                        (or (cdr (assoc 'red colors)) (cdr (assoc 'palette-1 colors)) bg)))
              (red (matugen-theme--ensure-contrast red-raw bg is-dark 4.5))
-             (green-raw (or (cdr (assoc 'green colors)) (cdr (assoc 'palette-2 colors)) bg))
+             
+             (green-raw (if use-harm (matugen-theme--blend modus-green bg 0.70)
+                          (or (cdr (assoc 'green colors)) (cdr (assoc 'palette-2 colors)) bg)))
              (green (matugen-theme--ensure-contrast green-raw bg is-dark 4.5))
-             (yellow-raw (or (cdr (assoc 'yellow colors)) (cdr (assoc 'palette-3 colors)) bg))
+             
+             (yellow-raw (if use-harm (matugen-theme--blend modus-yellow bg 0.70)
+                           (or (cdr (assoc 'yellow colors)) (cdr (assoc 'palette-3 colors)) bg)))
              (yellow (matugen-theme--ensure-contrast yellow-raw bg is-dark 4.5))
-             (blue-raw (or (cdr (assoc 'blue colors)) (cdr (assoc 'palette-4 colors)) bg))
+             
+             (blue-raw (if use-harm (matugen-theme--blend modus-blue bg 0.70)
+                         (or (cdr (assoc 'blue colors)) (cdr (assoc 'palette-4 colors)) bg)))
              (blue (matugen-theme--ensure-contrast blue-raw bg is-dark 4.5))
-             (magenta-raw (or (cdr (assoc 'magenta colors)) (cdr (assoc 'palette-5 colors)) bg))
+             
+             (magenta-raw (if use-harm (matugen-theme--blend modus-magenta bg 0.70)
+                            (or (cdr (assoc 'magenta colors)) (cdr (assoc 'palette-5 colors)) bg)))
              (magenta (matugen-theme--ensure-contrast magenta-raw bg is-dark 4.5))
-             (cyan-raw (or (cdr (assoc 'cyan colors)) (cdr (assoc 'palette-6 colors)) bg))
+             
+             (cyan-raw (if use-harm (matugen-theme--blend modus-cyan bg 0.70)
+                         (or (cdr (assoc 'cyan colors)) (cdr (assoc 'palette-6 colors)) bg)))
              (cyan (matugen-theme--ensure-contrast cyan-raw bg is-dark 4.5))
              
              ;; Force Emacs to adopt the appropriate Modus base theme.
@@ -227,6 +259,7 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
           (setq modus-themes-common-palette-overrides
                 (cond ((eq matugen-theme-style 'accent) accent-overrides)
                       ((eq matugen-theme-style 'background) bg-overrides)
+                      ((eq matugen-theme-style 'harmonized) (append bg-overrides accent-overrides))
                       (t (append bg-overrides accent-overrides)))))
         
         ;; Purge all currently active themes to prevent face clashing
