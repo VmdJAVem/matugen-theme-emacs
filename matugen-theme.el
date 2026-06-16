@@ -252,7 +252,16 @@ If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened."
          ;; UI and Modeline
          `(mode-line ((t (:background ,bg-active :foreground ,fg-main))))
          `(mode-line-inactive ((t (:background ,bg-alt :foreground ,fg-dim))))
+         ;; Minibuffer and Completion UI
          `(minibuffer-prompt ((t (:foreground ,cyan :weight bold))))
+         `(vertico-current ((t (:background ,seed :foreground ,bg :weight bold))))
+         `(ivy-current-match ((t (:background ,seed :foreground ,bg :weight bold))))
+         `(helm-selection ((t (:background ,seed :foreground ,bg :weight bold))))
+         `(corfu-current ((t (:background ,seed :foreground ,bg :weight bold))))
+         `(company-tooltip-selection ((t (:background ,seed :foreground ,bg :weight bold))))
+         `(isearch ((t (:background ,seed :foreground ,bg :weight bold))))
+         `(lazy-highlight ((t (:background ,bg-alt :foreground ,seed))))
+         
          `(vertical-border ((t (:foreground ,bg-active))))
          
          ;; Doom Emacs specific faces
