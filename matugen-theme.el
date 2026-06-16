@@ -176,8 +176,11 @@ If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened."
              
              (fg-main (or (cdr (assoc 'foreground colors)) (if is-dark "#ffffff" "#000000")))
              
-             ;; We use palette-1 or foreground as the 'seed' color to generate the wheel
-             (seed (or (cdr (assoc 'palette-1 colors)) fg-main))
+             ;; The true Matugen UI accent color is exported as 'cursor-color' in Ghostty or 'accent' in custom templates
+             (seed (or (cdr (assoc 'cursor-color colors))
+                       (cdr (assoc 'accent colors))
+                       (cdr (assoc 'palette-1 colors))
+                       fg-main))
              
              (native-red (if (eq matugen-theme-style 'monochrome) seed (or (cdr (assoc 'palette-1 colors)) seed)))
              (native-green (if (eq matugen-theme-style 'monochrome) (matugen-theme--mod-color seed 10 (not is-dark)) (or (cdr (assoc 'palette-2 colors)) seed)))
