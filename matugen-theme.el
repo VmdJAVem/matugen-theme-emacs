@@ -276,10 +276,11 @@ Uses pure mathematics to avoid Emacs daemon frame approximation bugs."
                   (border-mode-line-inactive ,border-mode))))
           
           (setq modus-themes-common-palette-overrides
-                (cond ((eq matugen-theme-style 'accent) accent-overrides)
-                      ((eq matugen-theme-style 'background) bg-overrides)
-                      ((or use-sci (memq matugen-theme-style '(harmonized neon))) (append bg-overrides accent-overrides))
-                      (t (append bg-overrides accent-overrides)))))
+              (cond ((eq matugen-theme-style 'full) (append bg-overrides accent-overrides))
+                    ((eq matugen-theme-style 'background) bg-overrides)
+                    ((eq matugen-theme-style 'accent) accent-overrides)
+                    ((memq matugen-theme-style '(harmonized neon)) (append bg-overrides accent-overrides))
+                    (t (append bg-overrides accent-overrides)))))
         
         ;; Purge all currently active themes to prevent face clashing
         (mapc #'disable-theme custom-enabled-themes)
