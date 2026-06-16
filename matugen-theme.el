@@ -256,8 +256,11 @@ If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened."
          `(vertical-border ((t (:foreground ,bg-active))))
          
          ;; Doom Emacs specific faces
-         `(doom-dashboard-menu-title ((t (:foreground ,blue :weight bold))))
+         `(doom-dashboard-banner ((t (:foreground ,seed))))
+         `(doom-dashboard-menu-title ((t (:foreground ,seed :weight bold))))
          `(doom-dashboard-menu-desc ((t (:foreground ,fg-dim))))
+         `(doom-dashboard-footer ((t (:foreground ,seed))))
+         `(doom-dashboard-footer-icon ((t (:foreground ,seed))))
          `(solaire-default-face ((t (:background ,bg :foreground ,fg-main))))
          `(solaire-hl-line-face ((t (:background ,bg-alt))))
          `(solaire-org-hide-face ((t (:background ,bg :foreground ,bg))))
