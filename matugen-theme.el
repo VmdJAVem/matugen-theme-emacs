@@ -252,7 +252,7 @@ If LIGHTEN is non-nil, the colour is lightened; otherwise, darkened."
          `(org-meta-line ((t (:foreground ,fg-dim :slant italic))))
          `(org-code ((t (:foreground ,yellow :background ,bg-alt))))
          `(org-verbatim ((t (:foreground ,green :background ,bg-alt))))
-	 '(org-link ((t (:foreground ,blue slant italic))))
+	 '(org-link ((t (:foreground ,blue :slant italic))))
          
          ;; UI and Modeline
          `(mode-line ((t (:background ,bg-active :foreground ,fg-main))))
